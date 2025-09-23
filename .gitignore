@@ -1,0 +1,10 @@
+# Rust
+/target
+**/*.rs.bk
+
+# VS Code
+.vscode/
+
+# OS cruft
+.DS_Store
+Thumbs.db
