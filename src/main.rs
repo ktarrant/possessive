@@ -1,6 +1,9 @@
 use bevy::prelude::*;
 use bevy::render::camera::Projection;
-use bevy_ecs_tiled::prelude::*; // TiledPlugin, TiledMapAsset, TiledMap, TilemapAnchor
+use bevy_ecs_tiled::prelude::*;
+use bevy_mod_aseprite::AsepritePlugin;
+mod hero;
+use hero::HeroPlugin;
 
 fn main() {
     App::new()
@@ -8,10 +11,12 @@ fn main() {
             DefaultPlugins.set(AssetPlugin {
                 watch_for_changes_override: Some(true), // hot reload
                 ..default()
-            })
+            }).set(ImagePlugin::default_nearest()),
         )
+        .add_plugins(AsepritePlugin)
+        .add_plugins(HeroPlugin)
         .add_plugins(TiledPlugin::default())
-        .add_systems(Startup, (setup_camera, spawn_map, spawn_debug_square))
+        .add_systems(Startup, (setup_camera, spawn_map))
         .run();
 }
 
@@ -27,20 +32,12 @@ fn spawn_map(mut commands: Commands, assets: Res<AssetServer>) {
     ));
 }
 
-fn spawn_debug_square(mut commands: Commands) {
-    commands.spawn(Sprite {
-        color: Color::srgba(1.0, 0.0, 0.0, 1.0),
-        rect: Some(Rect::from_center_size(Vec2::ZERO, Vec2::splat(100.0))),
-        ..default()
-    });
-}
-
 fn setup_camera(mut commands: Commands) {
     commands.spawn((
         Camera2d,
         Camera::default(),
         Projection::Orthographic(OrthographicProjection {
-            scale: 6.0,                          // start zoomed out for big iso tiles
+            scale: 1.0,                          // start zoomed out for big iso tiles
             ..OrthographicProjection::default_2d()
         }),
         Transform::from_xyz(0.0, 0.0, 1000.0),  // important: +Z

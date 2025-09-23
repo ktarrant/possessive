@@ -7,6 +7,7 @@ edition = "2021"
 [dependencies]
 bevy = { version = "0.16", features = ["file_watcher"] }
 bevy_ecs_tiled = "0.9"
+bevy_mod_aseprite = "0.10"
 
 [features]
 default = []
