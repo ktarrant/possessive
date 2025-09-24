@@ -1,0 +1,8 @@
+(
+    size: (512, 512),
+    player_spawns: (
+        center_radius: 160,
+        elevation: 8.0,
+        base_radius: 15,
+    ),
+)

@@ -1,15 +1,9 @@
-// src/terrain/mod.rs
 pub mod template;
 pub mod grid;
-pub mod rng;
-pub mod noise;
-pub mod masks;
-pub mod poisson;
-pub mod river;
-pub mod placement;
 pub mod generate;
 pub mod debug_png;
+pub mod ley;
 
-// (optional) re-exports so main.rs can use short paths
-pub use generate::generate_map;
-pub use template::MapTemplate;
+pub use generate::{generate_phase1_bases, Phase1Bases};
+pub use template::{MapTemplate, PlayerSpawns};
+pub use ley::{generate_ley, LeyNetwork};
