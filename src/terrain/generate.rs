@@ -29,14 +29,12 @@ pub fn generate_map(tpl: &MapTemplate, seed: u64) -> GeneratedMap {
     let mut water = Mask::new(size.x, size.y);
     let mut gold = Vec::new();
     let mut berries = Vec::new();
-    let forest = Vec::new();
+    let mut forest = Vec::new();
 
     let seq = RngSeq::new(seed);
 
     // Phase: elevation
     {
-        let rng = seq.for_phase(1);
-        let center = size.as_vec2() / 2.0;
         let center = size.as_vec2() / 2.0;
         for y in 0..size.y {
             for x in 0..size.x {
@@ -96,23 +94,51 @@ pub fn generate_map(tpl: &MapTemplate, seed: u64) -> GeneratedMap {
     // Phase: per-player fairness packs
     {
         let mut rng = seq.for_phase(3);
-        let center_excl = 10;
+        // let center_excl = 10;
         let allowed = passable.and_not(&water);
         for &s in &player_starts {
             for _ in 0..tpl.fairness.primary_gold {
-                let _ok = place_pack_near(&mut rng, &passable, &allowed, s, 18, 28, PackSpec::Gold { piles: 1 }, &mut gold, &mut berries);
-                let _ok2 = place_pack_near(&mut rng, &passable, &allowed, s, 12, 22, PackSpec::Berries { bushes: 6 }, &mut gold, &mut berries);
+                let _ = place_pack_near(&mut rng, &passable, &allowed, s, 18, 28,
+                    PackSpec::Gold { piles: 1 }, &mut gold, &mut berries);
             }
-            if tpl.fairness.secondary_gold > 0 {
-                let _ok = place_pack_near(&mut rng, &passable, &allowed, s, 26, 42, PackSpec::Gold { piles: 1 }, &mut gold, &mut berries);
+            for _ in 0..tpl.fairness.berries {
+                let _ = place_pack_near(&mut rng, &passable, &allowed, s, 12, 22,
+                    PackSpec::Berries { bushes: 6 }, &mut gold, &mut berries);
             }
-            // straggler trees near TC (scatter one-ring)
+            for _ in 0..tpl.fairness.secondary_gold {
+                let _ = place_pack_near(&mut rng, &passable, &allowed, s, 26, 42,
+                    PackSpec::Gold { piles: 1 }, &mut gold, &mut berries);
+            }
+
+            // simple “straggler” trees uses densities.stragglers_per_player
+            for _ in 0..tpl.densities.stragglers_per_player {
+                let a = rng.gen::<f32>() * std::f32::consts::TAU;
+                let r = rng.gen_range(4..=10) as f32;
+                let p = s + IVec2::new((a.cos()*r).round() as i32, (a.sin()*r).round() as i32);
+                if p.x>=0 && p.y>=0 && p.x<size.x && p.y<size.y
+                    && passable.get(p.x, p.y) && !water.get(p.x, p.y) {
+                    forest.push(p);
+                    passable.set(p.x, p.y, false); // mark occupied so we don't scatter on top later
+                }
+            }
         }
-        // Forest fill (blue-noise)
+
+
+        // 2) Forest fill via blue-noise
+        //    IMPORTANT: compute allowed after marking stragglers as non-passable so scatter avoids them.
         let forest_allowed = passable.and_not(&water);
-        let mut rng = seq.for_phase(3); // or reuse the phase you use for features
-        let forest = scatter_forest(&mut rng, size, &forest_allowed, (1.0 / tpl.densities.forest_density).max(4.0), 30);
-        for t in &forest { passable.set(t.x, t.y, false); }
+
+        // use a different phase for reproducibility
+        let mut rng_forest = seq.for_phase(4);
+        let mut scattered =
+            scatter_forest(&mut rng_forest, size, &forest_allowed,
+                        (1.0 / tpl.densities.forest_density).max(4.0), 30);
+
+        // mark passability and append to the main forest list
+        for t in &scattered {
+            passable.set(t.x, t.y, false);
+        }
+        forest.append(&mut scattered);
     }
 
     GeneratedMap { size, height, passable, water, forest, gold, berries, player_starts }

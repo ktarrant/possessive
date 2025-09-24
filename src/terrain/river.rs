@@ -25,10 +25,6 @@ pub fn carve_river(
         let uphill_penalty = if dh > 0.0 { (dh * 80.0) as u32 } else { 0 };
         10 + uphill_penalty  // base + penalty
     };
-    // integer heuristic (Manhattan)
-    let h_est = |p: IVec2| -> u32 {
-        (p.x - sink.x).abs() as u32 + (p.y - sink.y).abs() as u32
-    };
 
     if let Some((path, _)) = astar(
         &source,
@@ -36,17 +32,10 @@ pub fn carve_river(
             let src = *p;
             neigh(src)
                 .into_iter()
-                .map(|q| {
-                    let c = cost(src, q);
-                    (q, c)
-                })
-                .collect::<Vec<_>>()  // return an owned Vec
+                .map(|q| (q, cost(src, q)))
+                .collect::<Vec<_>>() // own it, no lifetime issues
         },
-        |p| {
-            let dx = (p.x - sink.x).abs() as u32;
-            let dy = (p.y - sink.y).abs() as u32;
-            dx + dy
-        },
+        |p| (p.x - sink.x).abs() as u32 + (p.y - sink.y).abs() as u32,
         |p| *p == sink,
     ) {
         for &p in &path {
