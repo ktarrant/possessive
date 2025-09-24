@@ -1,4 +1,16 @@
 use glam::{IVec2, Vec2};
+use super::grid::Grid;
+use super::template::{MapTemplate, TerrainWeights, TerrainRules, TerrainArea, AreaSource};
+use super::debug_png::{write_height_with_disks, write_height_with_overlays, write_terrain_classes};
+
+/// Simple configuration for Phase 2 ley network.
+pub struct LeyConfig {
+    pub m_shrines: usize,   // how many shrines
+    pub shrine_ring: i32,   // ring radius for shrines
+    pub offset_deg: f32,    // angular offset vs. base ring start (e.g., 180/n for half-step)
+    pub connect_cycle: bool,
+    pub connect_spokes: bool,
+}
 
 /// Raw ley output for Phase 2
 pub struct LeyNetwork {

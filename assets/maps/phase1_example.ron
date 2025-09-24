@@ -1,8 +1,14 @@
 (
-    size: (512, 512),
-    player_spawns: (
-        center_radius: 160,
-        elevation: 8.0,
-        base_radius: 15,
-    ),
+  size: (512, 512),
+  player_spawns: ( center_radius: 160, elevation: 8.0, base_radius: 15 ),
+  terrain: (
+    default: ( grassland: 0.7, forest: 0.25, water: 0.03, mountain: 0.02 ),
+    areas: [
+      ( source: Spawn,  radius:  60,  weights: ( grassland: 0.10, forest: 0.70, water: 0.10, mountain: 0.10 ) ),
+      ( source: Spawn,  radius: 120,  weights: ( grassland: 0.50, forest: 0.20, water: 0.30, mountain: 0.00 ) ),
+      ( source: Spawn,  radius: 180,  weights: ( grassland: 0.20, forest: 0.20, water: 0.30, mountain: 0.30 ) ),
+      ( source: Center, radius:  60,  weights: ( grassland: 0.05, forest: 0.05, water: 0.10, mountain: 0.80 ) ),
+      ( source: Center, radius: 200,  weights: ( grassland: 0.20, forest: 0.50, water: 0.20, mountain: 0.10 ) ),
+    ],
+  ),
 )

@@ -130,3 +130,20 @@ pub fn write_height_with_overlays(
 
     img.save(path).expect("save png");
 }
+
+pub fn write_terrain_classes(
+    path: &str,
+    classes: &Grid<u8>,                 // 0..=3 terrain IDs
+    palette: &[[u8; 4]; 4],             // RGBA for each class
+) {
+    let (w, h) = (classes.w as u32, classes.h as u32);
+    let mut img = ImageBuffer::<Rgba<u8>, Vec<u8>>::new(w, h);
+    for y in 0..classes.h {
+        for x in 0..classes.w {
+            let id = *classes.get(x, y).min(&3u8);
+            let c = palette[id as usize];
+            img.put_pixel(x as u32, y as u32, Rgba(c));
+        }
+    }
+    img.save(path).expect("save png");
+}
