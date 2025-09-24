@@ -5,8 +5,8 @@ use glam::IVec2;
 use super::spawns::{Phase1Bases, generate_phase1_bases};
 use super::ley::{LeyConfig, LeyNetwork, generate_ley};
 use super::landscape::{generate_phase3_terrain_clumps};
-use super::blend::{blend_terrain_and_save, BlendSettings};
-use super::blend::{blend_fractal_and_save, FractalSettings};
+use super::blend::{blend_terrain, BlendSettings};
+use super::blend::{blend_fractal, FractalSettings};
 
 // Save per phase, now using the new Phase 3:
 pub fn generate_all_phases_and_save(
@@ -19,10 +19,18 @@ pub fn generate_all_phases_and_save(
 ) -> (Phase1Bases, LeyNetwork, Grid<u8>) {
     std::fs::create_dir_all(out_dir).ok();
 
+    const PALETTE: [[u8;4];4] = [
+        [110,180,110,255], // grassland
+        [ 34,139, 34,255], // forest
+        [ 64,120,255,255], // water
+        [150,150,150,255], // mountain
+    ];
+
     // Phase 1
     let p1 = generate_phase1_bases(tpl, num_bases, Some(start_angle_deg));
-    let p1_path = format!("{}/phase1_bases.png", out_dir);
     let base_disks: Vec<_> = p1.base_centers.iter().map(|&c| (c, p1.base_radius, [255,64,64])).collect();
+    // Save debug image
+    let p1_path = format!("{}/phase1_bases.png", out_dir);
     write_height_with_disks(&p1_path, &p1.height, &base_disks);
 
     // Phase 2
@@ -31,7 +39,6 @@ pub fn generate_all_phases_and_save(
         ley_cfg.m_shrines, ley_cfg.shrine_ring, ley_cfg.offset_deg,
         ley_cfg.connect_cycle, ley_cfg.connect_spokes
     );
-    let p2_path = format!("{}/phase2_ley.png", out_dir);
     let base_disks_rgba: Vec<_> = p1.base_centers.iter().map(|&c| (c, p1.base_radius, [255,64,64,200])).collect();
     let shrine_points: Vec<_> = ley.shrines.iter().copied().map(|p| (p, [64,255,255,255])).collect();
     let center_px = IVec2::new(tpl.size.0/2, tpl.size.1/2);
@@ -40,33 +47,34 @@ pub fn generate_all_phases_and_save(
         let color = if is_spoke { [64,96,255,255] } else { [64,255,96,255] };
         (a,b,color)
     }).collect();
+    // Save debug image
+    let p2_path = format!("{}/phase2_ley.png", out_dir);
     write_height_with_overlays(&p2_path, &p1.height, &base_disks_rgba, &shrine_points, &ley_lines);
 
-    // Phase 3 (NEW clumpy terrain + hard buffers)
+    // Phase 3
     let classes = generate_phase3_terrain_clumps(tpl, &p1.base_centers, &ley.shrines, terrain_seed);
+    // Save debug image
     let p3_path = format!("{}/phase3_terrain.png", out_dir);
-    const PALETTE: [[u8;4];4] = [
-        [110,180,110,255], // grassland
-        [ 34,139, 34,255], // forest
-        [ 64,120,255,255], // water
-        [150,150,150,255], // mountain
-    ];
     write_terrain_classes(&p3_path, &classes, &PALETTE);
 
-    let blended = blend_terrain_and_save(
+    // Phase 4A (blending)
+    let blended = blend_terrain(
         &tpl,
         &p1.base_centers,
         &ley.shrines,
         &classes,                    // from Phase 3
         BlendSettings::default(),    // tweak as you like
-        "out/phase4_blended.png",
     );
+    // Save debug image
+    let p4a_path = format!("{}/phase4a_blend.png", out_dir);
+    write_terrain_classes(&p4a_path, &blended, &PALETTE);
 
-    let fractal = blend_fractal_and_save(
+    // Phase 4B fractalize
+    let fractal = blend_fractal(
         &tpl,
         &p1.base_centers,
         &ley.shrines,
-        &classes,
+        &blended,
         FractalSettings {
             iterations: 2,          // try 2–3
             radii: [2,3,2,3],
@@ -79,8 +87,10 @@ pub fn generate_all_phases_and_save(
             warp_lacunarity: 2.2,
             seed: 42,
         },
-        "out/phase4b_fractal.png",
     );
+    // Save debug image
+    let p4b_path = format!("{}/phase4b_fractal.png", out_dir);
+    write_terrain_classes(&p4b_path, &fractal, &PALETTE);
 
-    (p1, ley, classes)
+    (p1, ley, fractal)
 }

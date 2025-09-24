@@ -1,13 +1,7 @@
 use super::grid::Grid;
 use super::template::MapTemplate;
 use glam::IVec2;
-use super::debug_png::write_terrain_classes;
-
-// Keep the same ids as landscape.rs
-pub const TERRAIN_GRASSLAND: u8 = 0;
-pub const TERRAIN_FOREST:    u8 = 1;
-pub const TERRAIN_WATER:     u8 = 2;
-pub const TERRAIN_MOUNTAIN:  u8 = 3;
+use super::landscape::{TERRAIN_GRASSLAND};
 
 #[derive(Clone, Copy)]
 pub struct BlendSettings {
@@ -187,7 +181,7 @@ fn value_noise_2d(x: f32, y: f32, seed: u32) -> f32 {
 }
 
 // Fractal Brownian Motion
-fn fbm_2d(mut x: f32, mut y: f32, seed: u32, octaves: u32, gain: f32, lacunarity: f32) -> f32 {
+fn fbm_2d(x: f32, y: f32, seed: u32, octaves: u32, gain: f32, lacunarity: f32) -> f32 {
     let mut amp = 1.0;
     let mut freq = 1.0;
     let mut sum = 0.0;
@@ -220,13 +214,12 @@ fn sample_scalar(buf: &[f32], w: i32, h: i32, x: f32, y: f32) -> f32 {
 
 /// Phase 4: Blend sharp borders into natural transitions.
 /// Returns a new classes grid and writes `phase4_blended.png`.
-pub fn blend_terrain_and_save(
+pub fn blend_terrain(
     tpl: &MapTemplate,
     base_centers: &[IVec2],
     shrines: &[IVec2],
     classes_in: &Grid<u8>,
     settings: BlendSettings,
-    out_path: &str,
 ) -> Grid<u8> {
     let (w,h) = (classes_in.w, classes_in.h);
     let total = (w*h) as usize;
@@ -298,25 +291,15 @@ pub fn blend_terrain_and_save(
         if locked[idx(w,x,y)] != 0 { classes.set(x,y, TERRAIN_GRASSLAND); }
     }}
 
-    // Save debug image
-    const PALETTE: [[u8;4];4] = [
-        [110,180,110,255], // grass
-        [ 34,139, 34,255], // forest
-        [ 64,120,255,255], // water
-        [150,150,150,255], // mountain
-    ];
-    write_terrain_classes(out_path, &classes, &PALETTE);
-
     classes
 }
 
-pub fn blend_fractal_and_save(
+pub fn blend_fractal(
     tpl: &MapTemplate,
     base_centers: &[IVec2],
     shrines: &[IVec2],
     classes_in: &Grid<u8>,
     settings: FractalSettings,
-    out_path: &str,
 ) -> Grid<u8> {
     let (w,h) = (classes_in.w, classes_in.h);
     let total = (w*h) as usize;
@@ -341,7 +324,7 @@ pub fn blend_fractal_and_save(
         for y in 0..h {
             for x in 0..w {
                 let i = idx(w,x,y);
-                let k = if locked[i]!=0 { super::blend::TERRAIN_GRASSLAND } else { *classes.get(x,y) };
+                let k = if locked[i]!=0 { TERRAIN_GRASSLAND } else { *classes.get(x,y) };
                 chan[k as usize][i] = 1.0;
             }
         }
@@ -357,7 +340,7 @@ pub fn blend_fractal_and_save(
                 let i = idx(w,x,y);
 
                 if locked[i] != 0 {
-                    next.set(x,y, super::blend::TERRAIN_GRASSLAND);
+                    next.set(x,y, TERRAIN_GRASSLAND);
                     continue;
                 }
                 if settings.boundary_only && !is_boundary(&classes, x, y) {
@@ -389,17 +372,8 @@ pub fn blend_fractal_and_save(
 
     // Keep locked areas grass, defensively
     for y in 0..h { for x in 0..w {
-        if locked[idx(w,x,y)]!=0 { classes.set(x,y, super::blend::TERRAIN_GRASSLAND); }
+        if locked[idx(w,x,y)]!=0 { classes.set(x,y, TERRAIN_GRASSLAND); }
     }}
-
-    // Save preview
-    const PALETTE: [[u8;4];4] = [
-        [110,180,110,255],
-        [ 34,139, 34,255],
-        [ 64,120,255,255],
-        [150,150,150,255],
-    ];
-    write_terrain_classes(out_path, &classes, &PALETTE);
 
     classes
 }
