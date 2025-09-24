@@ -2,7 +2,7 @@ use glam::{IVec2, Vec2};
 use rand::Rng;
 use rand_pcg::Pcg64Mcg;
 
-use super::{grid::Grid, masks::Mask, poisson::poisson_sample};
+use super::{masks::Mask, poisson::poisson_sample};
 
 #[derive(Clone, Copy)]
 pub enum PackSpec { Gold { piles: usize }, Berries { bushes: usize } }

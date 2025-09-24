@@ -1,4 +1,4 @@
-use noise::{NoiseFn, Fbm, RidgedMulti, Seedable};
+use noise::{NoiseFn, Fbm, RidgedMulti};
 use noise::MultiFractal; // needed for set_octaves
 
 pub enum LayerKind { Fbm, Ridged }

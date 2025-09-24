@@ -1,11 +1,10 @@
 use glam::{IVec2, Vec2};
-use rand::SeedableRng;
 use rand::Rng;
 use rand_pcg::Pcg64Mcg;
 
 use super::grid::{Grid, clamp};
 use super::masks::Mask;
-use super::noise::{Layer, LayerKind, layer_value};
+use super::noise::layer_value;
 use super::placement::{place_pack_near, scatter_forest, PackSpec};
 use super::rng::RngSeq;
 use super::river::carve_river;
@@ -30,13 +29,13 @@ pub fn generate_map(tpl: &MapTemplate, seed: u64) -> GeneratedMap {
     let mut water = Mask::new(size.x, size.y);
     let mut gold = Vec::new();
     let mut berries = Vec::new();
-    let mut forest = Vec::new();
+    let forest = Vec::new();
 
     let seq = RngSeq::new(seed);
 
     // Phase: elevation
     {
-        let mut rng = seq.for_phase(1);
+        let rng = seq.for_phase(1);
         let center = size.as_vec2() / 2.0;
         let center = size.as_vec2() / 2.0;
         for y in 0..size.y {

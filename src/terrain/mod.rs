@@ -11,5 +11,5 @@ pub mod generate;
 pub mod debug_png;
 
 // (optional) re-exports so main.rs can use short paths
-pub use generate::{generate_map, GeneratedMap};
-pub use template::{MapTemplate, Symmetry};
+pub use generate::generate_map;
+pub use template::MapTemplate;
