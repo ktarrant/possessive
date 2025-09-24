@@ -5,6 +5,8 @@ use glam::IVec2;
 use super::spawns::{Phase1Bases, generate_phase1_bases};
 use super::ley::{LeyConfig, LeyNetwork, generate_ley};
 use super::landscape::{generate_phase3_terrain_clumps};
+use super::blend::{blend_terrain_and_save, BlendSettings};
+use super::blend::{blend_fractal_and_save, FractalSettings};
 
 // Save per phase, now using the new Phase 3:
 pub fn generate_all_phases_and_save(
@@ -50,6 +52,35 @@ pub fn generate_all_phases_and_save(
         [150,150,150,255], // mountain
     ];
     write_terrain_classes(&p3_path, &classes, &PALETTE);
+
+    let blended = blend_terrain_and_save(
+        &tpl,
+        &p1.base_centers,
+        &ley.shrines,
+        &classes,                    // from Phase 3
+        BlendSettings::default(),    // tweak as you like
+        "out/phase4_blended.png",
+    );
+
+    let fractal = blend_fractal_and_save(
+        &tpl,
+        &p1.base_centers,
+        &ley.shrines,
+        &classes,
+        FractalSettings {
+            iterations: 2,          // try 2–3
+            radii: [2,3,2,3],
+            inertia: 0.2,           // lower = freer to change at edges
+            boundary_only: true,
+            warp_amp: 5.0,          // stronger jaggies
+            warp_freq: 1.0/20.0,    // coarser patterns
+            warp_octaves: 3,
+            warp_gain: 0.55,
+            warp_lacunarity: 2.2,
+            seed: 42,
+        },
+        "out/phase4b_fractal.png",
+    );
 
     (p1, ley, classes)
 }
