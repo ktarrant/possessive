@@ -146,12 +146,57 @@ impl Default for FractalConfig {
     }
 }
 
+#[derive(Deserialize, Clone, Copy)]
+pub enum Region {
+    Grassland,
+    Forest,
+    Water,
+    Mountain,
+}
+
+#[derive(Deserialize, Clone, Copy)]
+pub struct Density {
+    pub count: f32, // how many per 'area' units squared
+    pub area: f32,  // the reference area for 'count'
+}
+impl Density {
+    pub fn per_unit2(&self) -> f32 { if self.area > 0.0 { self.count / self.area } else { 0.0 } }
+}
+
+#[derive(Deserialize, Clone)]
+pub struct ObjectRegionRule {
+    pub region: Region,
+    pub density: Density,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct ObjectTypeRule {
+    pub name: String,                      // "Tree"
+    pub radius: i32,                       // min distance to ANY object (in map units/tiles)
+    #[serde(default)]
+    pub per_region: Vec<ObjectRegionRule>, // empty = not placed anywhere
+}
+
+#[derive(Deserialize, Clone)]
+pub struct ObjectPlacementRules {
+    #[serde(default = "default_seed")]
+    pub base_seed: u32,
+    #[serde(default)]
+    pub types: Vec<ObjectTypeRule>,
+}
+fn default_seed() -> u32 { 0 }
+
+impl Default for ObjectPlacementRules {
+    fn default() -> Self { Self { base_seed: 0, types: Vec::new() } }
+}
+
 // add to your MapTemplate
 #[derive(Deserialize, Clone)]
 pub struct MapTemplate {
     pub size: (i32, i32),
     pub player_spawns: super::template::PlayerSpawns,
     pub terrain: TerrainRules, 
+    pub objects: ObjectPlacementRules,
 
     #[serde(default)] pub ley: LeyConfig,
     #[serde(default)] pub blend: BlendConfig,

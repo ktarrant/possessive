@@ -2,11 +2,12 @@ use std::path::Path;
 use glam::IVec2;
 use super::grid::Grid;
 use super::template::{MapTemplate, LeyConfig, BlendConfig, FractalConfig};
-use super::debug_png::{write_height_with_disks, write_height_with_overlays, write_terrain_classes};
+use super::debug_png::{write_height_with_disks, write_height_with_overlays, write_terrain_classes, write_terrain_with_objects};
 use super::spawns::{Phase1Bases, generate_phase1_bases};
 use super::ley::{LeySettings, LeyNetwork, generate_ley};
 use super::landscape::generate_phase3_terrain_clumps;
 use super::blend::{blend_terrain, BlendSettings, blend_fractal, FractalSettings};
+use super::objects::{generate_objects, PlacedObject};
 
 // Converters from template configs -> runtime settings
 fn to_blend_settings(c: &BlendConfig) -> BlendSettings {
@@ -58,7 +59,7 @@ pub fn generate_all_phases(
     fractal_override: Option<FractalSettings>,
     terrain_seed: u32,
     out_dir: Option<&str>,
-) -> (Phase1Bases, LeyNetwork, Grid<u8>) {
+) -> (Phase1Bases, LeyNetwork, Grid<u8>, Vec<PlacedObject>) {
     // resolve configs (override > template > defaults)
     let ley_cfg = ley_override
         .unwrap_or_else(|| to_ley_settings(tpl, num_bases));
@@ -129,5 +130,17 @@ pub fn generate_all_phases(
         write_terrain_classes(&p.to_string_lossy(), &final_classes, &PALETTE);
     });
 
-    (p1, ley, final_classes)
+    // Phase 5 (Populate with objects)
+    let objs = generate_objects(
+        &tpl,
+        &final_classes,
+        &p1.base_centers,   // from Phase 1
+        &ley.shrines,       // from Phase 2
+        0,                  // extra_seed or your own objects_seed
+    );
+    save("phase5_objects.png", &|p| {
+        write_terrain_with_objects(&p.to_string_lossy(), &final_classes, &PALETTE, &objs, &tpl);
+    });
+
+    (p1, ley, final_classes, objs)
 }

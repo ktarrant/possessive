@@ -23,4 +23,34 @@
     iterations: 2, radii: (2,3,2,3), inertia: 0.2, boundary_only: true,
     warp_amp: 5.0, warp_freq: 0.05, warp_octaves: 3, warp_gain: 0.55, warp_lacunarity: 2.2, seed: 42
   ),
+  objects: (
+    base_seed: 1337, // optional; can be omitted
+
+    // Each object type has a radius (min distance to any other object) and per-region densities
+    types: [
+      (
+        name: "Tree",
+        radius: 3,
+        per_region: [
+          ( region: Forest,    density: (count: 5.0, area: 256.0) ),
+          ( region: Grassland, density: (count: 2.0, area: 256.0) ),
+        ],
+      ),
+      (
+        name: "Bush",
+        radius: 2,
+        per_region: [
+          ( region: Forest,    density: (count: 4.0, area: 256.0) ),
+          ( region: Grassland, density: (count: 3.0, area: 256.0) ),
+        ],
+      ),
+      (
+        name: "Cave",
+        radius: 8,
+        per_region: [
+          ( region: Forest, density: (count: 1.0, area: 2056.0) ),
+        ],
+      ),
+    ],
+  ),
 )
