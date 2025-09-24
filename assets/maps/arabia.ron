@@ -1,0 +1,30 @@
+(
+    name: "Arabia",
+    size: (192, 192),
+    elevation: (
+        base_level: 10.0,
+        falloff: 70.0,
+        layers: [
+            (freq: 0.010, amp: 5.0, octaves: 3, ridged: false),
+            (freq: 0.040, amp: 2.0, octaves: 2, ridged: true),
+        ]
+    ),
+    player_start_rules: (
+        symmetry: Rotational(4),
+        min_between_starts: 60,
+        min_to_center: 40,
+        plateau_radius: 7,
+        jitter: 6,
+    ),
+    fairness: (
+        primary_gold: 1,
+        secondary_gold: 1,
+        berries: 1,
+        max_distance_jitter: 8,
+    ),
+    densities: (
+        forest_density: 0.30,
+        stragglers_per_player: 6,
+    ),
+    water: false,
+)
