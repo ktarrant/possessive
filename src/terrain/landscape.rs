@@ -1,8 +1,6 @@
-use glam::{IVec2, Vec2};
+use glam::IVec2;
 use super::grid::Grid;
-use super::template::{MapTemplate, TerrainWeights, TerrainArea, AreaSource};
-use super::debug_png::{write_height_with_disks, write_height_with_overlays, write_terrain_classes};
-use super::ley::{LeyNetwork, generate_ley};
+use super::template::{MapTemplate, TerrainWeights, AreaSource};
 
 // Terrain class ids
 pub const TERRAIN_GRASSLAND: u8 = 0;

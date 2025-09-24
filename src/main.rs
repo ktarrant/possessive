@@ -1,6 +1,5 @@
 mod terrain;
 
-use terrain::{MapTemplate};
 use terrain::ley::{LeyConfig};
 use terrain::generate::{generate_all_phases_and_save};
 

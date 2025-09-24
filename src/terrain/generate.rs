@@ -1,7 +1,7 @@
 use super::grid::Grid;
-use super::template::{MapTemplate, TerrainWeights, TerrainRules, TerrainArea, AreaSource};
+use super::template::MapTemplate;
 use super::debug_png::{write_height_with_disks, write_height_with_overlays, write_terrain_classes};
-use glam::{IVec2, Vec2};
+use glam::IVec2;
 use super::spawns::{Phase1Bases, generate_phase1_bases};
 use super::ley::{LeyConfig, LeyNetwork, generate_ley};
 use super::landscape::{generate_phase3_terrain_clumps};
