@@ -1,5 +1,4 @@
 use glam::{IVec2, Vec2};
-use super::grid::Grid;
 
 /// Raw ley output for Phase 2
 pub struct LeyNetwork {

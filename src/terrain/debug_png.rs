@@ -2,33 +2,6 @@ use image::{ImageBuffer, Rgba};
 use glam::IVec2;
 use super::grid::Grid;
 
-/// Height-only grayscale for simple snapshots.
-pub fn write_height_grayscale(path: &str, height: &Grid<f32>) {
-    let w = height.w as u32; let h = height.h as u32;
-    let mut img = ImageBuffer::<Rgba<u8>, Vec<u8>>::new(w, h);
-
-    // normalize to [0,255]
-    let mut minv = f32::MAX; let mut maxv = f32::MIN;
-    for y in 0..height.h {
-        for x in 0..height.w {
-            let v = *height.get(x, y);
-            if v < minv { minv = v; }
-            if v > maxv { maxv = v; }
-        }
-    }
-    let span = (maxv - minv).max(1e-6);
-
-    for y in 0..height.h {
-        for x in 0..height.w {
-            let v = (*height.get(x, y) - minv) / span;
-            let g = (v * 255.0).clamp(0.0, 255.0) as u8;
-            img.put_pixel(x as u32, y as u32, Rgba([g, g, g, 255]));
-        }
-    }
-
-    img.save(path).expect("save png");
-}
-
 /// Grayscale height with filled colored disks overlaid (e.g., base areas).
 pub fn write_height_with_disks(
     path: &str,
