@@ -225,7 +225,6 @@ pub fn generate_phase3_terrain_clumps(
             while *target > 0 && tries < 4_000 {
                 tries += 1;
                 if let Some(c) = pick_center(&mut rng, &avail) {
-                    let before = painted.iter().filter(|&&p| p!=0).count();
                     let placed = stamp_blob(
                         &mut classes, &mut painted, &(!0u8).to_ne_bytes().repeat((w*h) as usize), // allowed=all (locked already in painted)
                         &area_mask, c, rmin, rmax, id, &mut rng

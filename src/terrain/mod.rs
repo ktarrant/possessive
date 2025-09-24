@@ -6,4 +6,3 @@ pub mod ley;
 pub mod landscape;
 pub mod spawns;
 
-pub use template::MapTemplate;

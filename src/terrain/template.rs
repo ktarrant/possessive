@@ -51,7 +51,6 @@ fn default_shrine_grass_radius() -> i32 { 12 }
 // Extend TerrainRules with shrine radius + clumps (both defaulted so your RON keeps working)
 #[derive(Deserialize, Clone)]
 pub struct TerrainRules {
-    pub default: TerrainWeights,
     pub areas: Vec<TerrainArea>,
     #[serde(default = "default_shrine_grass_radius")]
     pub shrine_grass_radius: i32,
