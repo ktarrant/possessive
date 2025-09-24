@@ -1,7 +1,7 @@
 use glam::{IVec2, Vec2};
 
 /// Simple configuration for Phase 2 ley network.
-pub struct LeyConfig {
+pub struct LeySettings {
     pub m_shrines: usize,   // how many shrines
     pub shrine_ring: i32,   // ring radius for shrines
     pub offset_deg: f32,    // angular offset vs. base ring start (e.g., 180/n for half-step)

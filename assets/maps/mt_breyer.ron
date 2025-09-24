@@ -11,4 +11,16 @@
       ( source: Center, radius: 200,  weights: ( grassland: 0.20, forest: 0.50, water: 0.20, mountain: 0.10 ) ),
     ],
   ),
+  ley: (
+    shrines_per_base: 1,
+    shrine_ring: 160,
+    offset_deg: 15.0,
+    connect_cycle: true,
+    connect_spokes: true,
+  ),
+  blend: ( iterations: 2, radii: (2,3,2,3), inertia: 0.25, boundary_only: true ),
+  fractal: (
+    iterations: 2, radii: (2,3,2,3), inertia: 0.2, boundary_only: true,
+    warp_amp: 5.0, warp_freq: 0.05, warp_octaves: 3, warp_gain: 0.55, warp_lacunarity: 2.2, seed: 42
+  ),
 )
