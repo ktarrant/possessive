@@ -154,9 +154,9 @@ fn color_for_type(i: usize, t: &ObjectTypeRule) -> [u8;4] {
     let name = t.name.to_lowercase();
     if name.contains("tree")  { return [255, 220,   0, 255]; } // bright yellow
     if name.contains("bush")  { return [255, 120,   0, 255]; } // vivid orange
-    if name.contains("cave")  { return [255,   0, 200, 255]; } // magenta
+    if name.contains("cave")  { return [  0, 255, 255, 255]; } // cyan
     if name.contains("rock")  { return [255,   0,   0, 255]; } // red
-    if name.contains("ruin")  { return [  0, 255, 255, 255]; } // cyan
+    if name.contains("ruin")  { return [255,   0, 200, 255]; } // magenta
 
     // Fallback: stable pseudo-random color from index
     let mut x = (i as u32).wrapping_mul(0x9E3779B1);

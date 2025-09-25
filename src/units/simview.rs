@@ -36,7 +36,7 @@ fn setup_camera(mut commands: Commands, map: Res<TileMap>) {
     commands.spawn((
         Camera2d,                          // 2D camera component
         Projection::Orthographic(OrthographicProjection {
-            scale: 2.0,                          // start zoomed out for big iso tiles
+            scale: 6.0,                          // start zoomed out for big iso tiles
             ..OrthographicProjection::default_2d()
         }),
         Transform::from_xyz(cx, cy, Z),    // center on the map
@@ -60,6 +60,7 @@ fn object_color(obj: TileObject) -> Color {
     match obj {
         TileObject::Tree => Color::srgba_u8(255, 220,   0, 255), // bright yellow
         TileObject::Bush => Color::srgba_u8(255, 120,   0, 255), // vivid orange
+        TileObject::Cave => Color::srgba_u8(  0, 255, 255, 255), // cyan
     }
 }
 
@@ -104,6 +105,7 @@ fn spawn_map_sprites(mut commands: Commands, map: Res<TileMap>) {
                 let pct = match obj {
                     TileObject::Tree => if t.nuts_max > 0.0 { t.nuts / t.nuts_max } else { 0.0 },
                     TileObject::Bush => if t.berries_max > 0.0 { t.berries / t.berries_max } else { 0.0 },
+                    TileObject::Cave => 1.0,
                 }.clamp(0.1, 1.0);
 
                 commands.spawn((
@@ -159,6 +161,7 @@ fn update_object_alpha(map: Res<TileMap>, mut q: Query<(&ObjectSprite, &mut Spri
                 let pct = match obj {
                     TileObject::Tree => if tile.nuts_max > 0.0 { tile.nuts / tile.nuts_max } else { 0.0 },
                     TileObject::Bush => if tile.berries_max > 0.0 { tile.berries / tile.berries_max } else { 0.0 },
+                    TileObject::Cave => 1.0,
                 }.clamp(0.1, 1.0);
                 sprite.color = object_color(obj).with_alpha(pct);
             }

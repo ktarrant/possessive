@@ -6,7 +6,7 @@ pub const TILE_SIZE: f32 = 1.0; // sim unit per tile
 pub enum Terrain { Forest, Grassland, Mountain, Water }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TileObject { Tree, Bush }
+pub enum TileObject { Tree, Bush, Cave }
 
 #[derive(Clone, Copy, Debug)]
 pub struct Tile {
