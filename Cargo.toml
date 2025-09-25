@@ -5,6 +5,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+bevy = { version = "0.16", features = ["file_watcher", "dynamic_linking"] }
+bevy_ecs_tiled = "0.9"
+bevy_mod_aseprite = "0.10"
+fastrand = "2"
 serde = { version = "1", features = ["derive"] }
 ron = "0.8"
 image = "0.25"
