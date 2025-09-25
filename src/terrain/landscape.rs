@@ -119,7 +119,7 @@ fn circle_mask(size: IVec2, c: IVec2, r: i32) -> Vec<u8> {
 
 /// New Phase 3: clumpy terrain that honors hard grass buffers around bases & shrines.
 /// We process areas in ascending radius so small/strong rules occupy space first.
-pub fn generate_phase3_terrain_clumps(
+pub fn generate_terrain_clumps(
     tpl: &MapTemplate,
     base_centers: &[IVec2],
     shrines: &[IVec2],

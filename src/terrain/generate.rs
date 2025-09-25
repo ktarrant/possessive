@@ -3,9 +3,9 @@ use glam::IVec2;
 use super::grid::Grid;
 use super::template::{MapTemplate, LeyConfig, BlendConfig, FractalConfig};
 use super::debug_png::{write_height_with_disks, write_height_with_overlays, write_terrain_classes, write_terrain_with_objects};
-use super::spawns::{Phase1Bases, generate_phase1_bases};
+use super::spawns::{BaseLocations, generate_bases};
 use super::ley::{LeySettings, LeyNetwork, generate_ley};
-use super::landscape::generate_phase3_terrain_clumps;
+use super::landscape::generate_terrain_clumps;
 use super::blend::{blend_terrain, BlendSettings, blend_fractal, FractalSettings};
 use super::objects::{generate_objects, PlacedObject};
 
@@ -59,7 +59,7 @@ pub fn generate_all_phases(
     fractal_override: Option<FractalSettings>,
     terrain_seed: u32,
     out_dir: Option<&str>,
-) -> (Phase1Bases, LeyNetwork, Grid<u8>, Vec<PlacedObject>) {
+) -> (BaseLocations, LeyNetwork, Grid<u8>, Vec<PlacedObject>) {
     // resolve configs (override > template > defaults)
     let ley_cfg = ley_override
         .unwrap_or_else(|| to_ley_settings(tpl, num_bases));
@@ -84,7 +84,7 @@ pub fn generate_all_phases(
     ];
 
     // Phase 1
-    let p1 = generate_phase1_bases(tpl, num_bases, Some(start_angle_deg));
+    let p1 = generate_bases(tpl, num_bases, Some(start_angle_deg));
     save("phase1_bases.png", &|p| {
         let base_disks: Vec<_> = p1.base_centers.iter().map(|&c| (c, p1.base_radius, [255,64,64])).collect();
         write_height_with_disks(&p.to_string_lossy(), &p1.height, &base_disks);
@@ -109,7 +109,7 @@ pub fn generate_all_phases(
     });
 
     // Phase 3
-    let classes = generate_phase3_terrain_clumps(tpl, &p1.base_centers, &ley.shrines, terrain_seed);
+    let classes = generate_terrain_clumps(tpl, &p1.base_centers, &ley.shrines, terrain_seed);
     save("phase3_terrain.png", &|p| {
         write_terrain_classes(&p.to_string_lossy(), &classes, &PALETTE);
     });

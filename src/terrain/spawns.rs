@@ -3,18 +3,18 @@ use super::template::MapTemplate;
 use glam::{IVec2, Vec2};
 
 /// Output of Phase 1: base disks flattened at identical elevation.
-pub struct Phase1Bases {
+pub struct BaseLocations {
     pub height: Grid<f32>,
     pub base_centers: Vec<IVec2>,
     pub base_radius: i32,
 }
 
 /// Phase 1 only (no file I/O): place `num_bases` evenly on a ring and flatten disks.
-pub fn generate_phase1_bases(
+pub fn generate_bases(
     tpl: &MapTemplate,
     num_bases: usize,
     start_angle_deg: Option<f32>,
-) -> Phase1Bases {
+) -> BaseLocations {
     assert!(num_bases >= 1, "num_bases must be >= 1");
 
     let size = IVec2::new(tpl.size.0, tpl.size.1);
@@ -50,5 +50,5 @@ pub fn generate_phase1_bases(
         }
     }
 
-    Phase1Bases { height, base_centers: centers, base_radius: r_disk }
+    BaseLocations { height, base_centers: centers, base_radius: r_disk }
 }
