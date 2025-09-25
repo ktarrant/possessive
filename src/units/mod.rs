@@ -4,3 +4,4 @@ pub mod world;
 pub mod simview;
 pub mod route;
 pub mod forage;
+pub mod movement;
