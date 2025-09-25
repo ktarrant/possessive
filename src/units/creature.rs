@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use super::base::{Position, Velocity, Kinematics, Species, BrainState, Brain};
 use super::world::{TILE_SIZE};
 use super::route::{Route, route_system};
-use super::forage::{forage_system, cell_center, is_predator};
+use super::forage::{forage_system, cell_center, is_predator, is_prey_of};
 use super::movement::{movement_system};
 
 // Predation
@@ -294,51 +294,58 @@ fn attack_system(
 
 fn prey_flee_system(
     map: Res<super::world::TileMap>,
-    predators: Query<(&Species, &Position), With<Species>>,
-    mut prey: Query<(&Species, &Position, &mut Brain), With<Species>>,
+    predators_q: Query<(&Species, &Position), With<Species>>,
+    mut prey_q: Query<(&Species, &Position, &mut Brain), With<Species>>,
 ) {
-    // collect predator positions
-    let preds: Vec<Vec2> = predators
+    // collect *threatening* actors: we’ll filter per-prey by is_prey_of
+    let preds: Vec<(Species, Vec2)> = predators_q
         .iter()
         .filter(|(sp, _)| is_predator(**sp))
-        .map(|(_, p)| p.p).collect();
+        .map(|(sp, p)| (*sp, p.p))
+        .collect();
 
     if preds.is_empty() { return; }
 
-    for (sp, pos, mut brain) in &mut prey {
-        if is_predator(*sp) { continue; } // predators don't flee in this simple pass
+    // ranges are defined "in tiles"; convert to world units once
+    let flee_r2 = (FLEE_SENSE_RANGE * TILE_SIZE).powi(2);
+    let flee_step_world = FLEE_SENSE_RANGE.max(FLEE_STEP) * TILE_SIZE; // step at least as far as sense
 
-        // nearest predator
-        let mut close = false;
-        let mut away = Vec2::ZERO;
+    for (prey_sp, pos, mut brain) in &mut prey_q {
+        // find nearest predator that actually hunts this species
         let mut best_d2 = f32::MAX;
+        let mut away = Vec2::ZERO;
 
-        for pp in &preds {
-            let d2 = pos.p.distance_squared(*pp);
+        for (pred_sp, ppos) in &preds {
+            if !is_prey_of(*pred_sp, *prey_sp) { continue; } // <- key change: fox will flee bears
+            let d2 = pos.p.distance_squared(*ppos);
             if d2 < best_d2 {
                 best_d2 = d2;
-                away = (pos.p - *pp).normalize_or_zero();
+                away = (pos.p - *ppos).normalize_or_zero();
             }
         }
 
-        if best_d2 <= FLEE_SENSE_RANGE * FLEE_SENSE_RANGE {
-            close = true;
+        // no relevant predator nearby → do not force a state; let decision_system run
+        if best_d2 == f32::MAX {
+            // if we were fleeing last frame, just clear the target so decision can replan
+            if brain.state == BrainState::Flee {
+                brain.desired_target = None;
+            }
+            continue;
         }
 
-        if close {
+        if best_d2 <= flee_r2 {
+            // trigger/refresh flee
             brain.state = BrainState::Flee;
             brain.target_cell = None;
             brain.target_entity = None;
 
-            // dash away and clamp
-            let flee_goal = map.clamp_target(pos.p + away * FLEE_STEP);
+            // dash away and clamp (use world-units step)
+            let flee_goal = map.clamp_target(pos.p + away * flee_step_world);
             brain.desired_target = Some(flee_goal);
-            // small replan so they can keep running if still threatened
-            brain.replan_cd = 0.3;
-        } else if brain.state != BrainState::Flee {
+            brain.replan_cd = 0.3; // keep updating while threatened
+        } else if brain.state == BrainState::Flee {
+            // threat far enough; stop steering here and let Decision choose next
             brain.state = BrainState::Wander;
-            brain.target_cell = None;
-            brain.target_entity = None;
             brain.desired_target = None;
         }
     }
