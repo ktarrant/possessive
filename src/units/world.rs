@@ -43,9 +43,9 @@ impl TileMap {
         self.idx(cell).map(|i| &self.tiles[i])
     }
 
-    // pub fn tile_at_cell_mut(&mut self, cell: IVec2) -> Option<&mut Tile> {
-    //     if let Some(i) = self.idx(cell) { Some(&mut self.tiles[i]) } else { None }
-    // }
+    pub fn tile_at_cell_mut(&mut self, cell: IVec2) -> Option<&mut Tile> {
+        if let Some(i) = self.idx(cell) { Some(&mut self.tiles[i]) } else { None }
+    }
 
     pub fn cell_at_world(&self, pos: Vec2) -> IVec2 {
         IVec2::new((pos.x / TILE_SIZE).floor() as i32, (pos.y / TILE_SIZE).floor() as i32)

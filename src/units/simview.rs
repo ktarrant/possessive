@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy::ui::{UiRect, PositionType, BackgroundColor, BorderColor};
 
 use super::world::{TileMap, TileObject, Terrain, food_totals, TILE_SIZE};
-use super::creature::{Species, species_color, Position};
+use super::creature::{Species, Position};
 
 
 const VIS_TILE_PIXELS: f32 = 16.0;
@@ -22,7 +22,8 @@ pub struct SimViewPlugin;
 impl Plugin for SimViewPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(MetricsTimer(Timer::from_seconds(0.25, TimerMode::Repeating)))
-            .add_systems(Startup, (setup_camera, spawn_map_sprites, attach_animal_sprites, spawn_metrics_panel))
+            .add_systems(Startup, (setup_camera, spawn_map_sprites, spawn_metrics_panel))
+            .add_systems(Update, attach_animal_sprites)
             .add_systems(Update, (sync_animal_sprites, update_object_alpha, update_metrics).chain());
     }
 }
@@ -57,13 +58,20 @@ fn terrain_color(t: Terrain) -> Color {
 // user-preferred object colors:
 fn object_color(obj: TileObject) -> Color {
     match obj {
-        TileObject::Tree => Color::srgba_u8(34, 139, 34, 255),      // forest green
-        TileObject::Bush => Color::srgba_u8(80, 200, 120, 255),     // mint-ish
-        // TileObject::Rock => Color::srgba_u8(120, 120, 120, 255),
-        // TileObject::Ruin => Color::srgba_u8(190, 160, 110, 255),
+        TileObject::Tree => Color::srgba_u8(255, 220,   0, 255), // bright yellow
+        TileObject::Bush => Color::srgba_u8(255, 120,   0, 255), // vivid orange
     }
 }
 
+fn species_color(sp: Species) -> Color {
+    match sp {
+        Species::Squirrel => Color::srgb(0.72, 0.40, 0.10), // brown-ish
+        Species::Deer     => Color::srgb(0.60, 0.45, 0.30),
+        Species::Bird     => Color::srgb(0.15, 0.55, 0.95),
+        Species::Fox      => Color::srgb(0.95, 0.40, 0.10),
+        Species::Bear     => Color::srgb(0.25, 0.25, 0.30),
+    }
+}
 
 fn tile_to_world(x: i32, y: i32) -> Vec3 {
     Vec3::new(
