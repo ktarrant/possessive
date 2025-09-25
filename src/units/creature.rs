@@ -335,6 +335,11 @@ fn prey_flee_system(
             brain.desired_target = Some(flee_goal);
             // small replan so they can keep running if still threatened
             brain.replan_cd = 0.3;
+        } else if brain.state != BrainState::Flee {
+            brain.state = BrainState::Wander;
+            brain.target_cell = None;
+            brain.target_entity = None;
+            brain.desired_target = None;
         }
     }
 }
