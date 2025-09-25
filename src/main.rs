@@ -25,7 +25,7 @@
 
 // src/main.rs (example wiring)
 use bevy::prelude::*;
-mod units { pub mod world; pub mod creature; pub mod simview; }
+mod units;
 use units::world::*;
 use units::creature::*;
 use units::simview::SimViewPlugin;

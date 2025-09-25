@@ -1,8 +1,9 @@
 use bevy::prelude::*;
 use bevy::ui::{UiRect, PositionType, BackgroundColor, BorderColor};
 
+use super::base::{Position};
 use super::world::{TileMap, TileObject, Terrain, food_totals, TILE_SIZE};
-use super::creature::{Species, Position};
+use super::creature::{Species};
 
 
 const VIS_TILE_PIXELS: f32 = 16.0;

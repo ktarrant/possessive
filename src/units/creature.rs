@@ -1,8 +1,9 @@
 use bevy::prelude::*;
+use super::base::{Position, Velocity, Kinematics};
 use super::world::{TILE_SIZE};
+use super::route::{Route, route_system};
 
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
-
 pub enum Species { Squirrel, Deer, Bird, Fox, Bear }
 // near your other enums
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -54,14 +55,9 @@ fn default_needs(sp: Species) -> Needs {
     }
 }
 
-#[derive(Component, Default, Debug)] pub struct Position { pub p: Vec2 }
-#[derive(Component, Default, Debug)] pub struct Velocity { pub v: Vec2 }
-#[derive(Component, Debug)] pub struct Kinematics { pub base_speed: f32 }
-
 #[derive(Component, Debug)]
 pub struct Brain {
     pub state: BrainState,
-    pub desired_target: Option<Vec2>,
     pub replan_cd: f32,
 
     // forage plant targeting
@@ -77,7 +73,6 @@ impl Default for Brain {
     fn default() -> Self {
         Self {
             state: BrainState::Wander,
-            desired_target: None,
             replan_cd: 0.0,
             target_cell: None,
             last_food_cell: None,
@@ -87,9 +82,6 @@ impl Default for Brain {
     }
 }
 
-#[derive(Component, Debug, Default)]
-pub struct Path { pub current_target: Option<Vec2> }
-
 #[derive(Bundle, Debug)]
 pub struct CreatureBundle {
     pub species: Species,
@@ -98,7 +90,7 @@ pub struct CreatureBundle {
     pub kin: Kinematics,
     pub needs: Needs,   // NEW
     pub brain: Brain,
-    pub path: Path,
+    pub route: super::route::Route,
 }
 
 impl CreatureBundle {
@@ -110,19 +102,19 @@ impl CreatureBundle {
             kin: Kinematics { base_speed },
             needs: default_needs(species), // NEW
             brain: Brain::default(),
-            path: Path::default(),
+            route: Route::default(),
         }
     }
 }
 
 #[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
-pub enum SimSet { Decision, Path, Movement }
+pub enum SimSet { Decision, Route, Movement }
 
 pub struct WildlifeSimPlugin;
 
 impl Plugin for WildlifeSimPlugin {
     fn build(&self, app: &mut App) {
-        app.configure_sets(Update, (SimSet::Decision, SimSet::Path, SimSet::Movement).chain())
+        app.configure_sets(Update, (SimSet::Decision, SimSet::Route, SimSet::Movement).chain())
             .add_systems(Update, needs_tick_system.before(SimSet::Decision))
 
             // DECISION set: prey flee first, then main decision, then hunt tracking
@@ -131,7 +123,7 @@ impl Plugin for WildlifeSimPlugin {
             .add_systems(Update, hunt_track_system.in_set(SimSet::Decision))
 
             // PATH & MOVEMENT as you already have
-            .add_systems(Update, path_system.in_set(SimSet::Path))
+            .add_systems(Update, route_system.in_set(SimSet::Route))
             .add_systems(Update, movement_system.in_set(SimSet::Movement))
 
             // Resolve attacks after movement (positions are up-to-date)
@@ -144,12 +136,12 @@ impl Plugin for WildlifeSimPlugin {
 fn decision_system(
     time: Res<Time>,
     map: Res<super::world::TileMap>,
-    mut q: Query<(&Species, &Needs, &Position, &mut Brain)>,
+    mut q: Query<(&Species, &Needs, &Position, &mut Brain, &mut Route)>,
     prey_scan: Query<(Entity, &Species, &Position)>, // read-only; used by predators
 ) {
     let dt = time.delta_secs();
 
-    for (sp, needs, pos, mut brain) in &mut q {
+    for (sp, needs, pos, mut brain, mut route) in &mut q {
         // tick cooldowns
         if brain.last_food_cooldown > 0.0 {
             brain.last_food_cooldown = (brain.last_food_cooldown - dt).max(0.0);
@@ -178,25 +170,25 @@ fn decision_system(
                 brain.state = BrainState::Hunt;
                 brain.target_entity = Some(e);
                 brain.target_cell = None;
-                brain.desired_target = Some(map.clamp_target(target_pos));
                 brain.replan_cd = 0.15; // track frequently
+                route.desired_target = Some(map.clamp_target(target_pos));
                 continue;
             }
 
             // no prey seen → hungry wander
-            if brain.replan_cd <= 0.0 || brain.desired_target.is_none() {
+            if brain.replan_cd <= 0.0 || route.desired_target.is_none() {
                 let jitter = Vec2::new(fastrand::f32() - 0.5, fastrand::f32() - 0.5)
                     .normalize_or_zero() * 5.0;
                 brain.state = BrainState::Hunt; // "searching"
-                brain.desired_target = Some(map.clamp_target(pos.p + jitter));
                 brain.replan_cd = 0.6;
+                route.desired_target = Some(map.clamp_target(pos.p + jitter));
             }
             continue;
         }
 
         // --- Herbivore/bird: hungry → forage plants ---
         if needs.is_hungry() {
-            if brain.replan_cd > 0.0 && brain.desired_target.is_some() { continue; }
+            if brain.replan_cd > 0.0 && route.desired_target.is_some() { continue; }
 
             if let Some((cell, _kind)) = nearest_food_cell(
                 &map, *sp, pos.p,
@@ -206,7 +198,7 @@ fn decision_system(
             ) {
                 brain.state = BrainState::Forage;
                 brain.target_cell = Some(cell);
-                brain.desired_target = Some(map.clamp_target(cell_center(cell)));
+                route.desired_target = Some(map.clamp_target(cell_center(cell)));
                 brain.replan_cd = 0.75;
             } else {
                 // hungry wander step
@@ -214,18 +206,18 @@ fn decision_system(
                     .normalize_or_zero() * 4.0;
                 brain.state = BrainState::Forage;
                 brain.target_cell = None;
-                brain.desired_target = Some(map.clamp_target(pos.p + jitter));
+                route.desired_target = Some(map.clamp_target(pos.p + jitter));
                 brain.replan_cd = 0.75;
             }
         } else {
             // satiated → wander
-            if brain.replan_cd > 0.0 && brain.desired_target.is_some() { continue; }
+            if brain.replan_cd > 0.0 && route.desired_target.is_some() { continue; }
             let jitter = Vec2::new(fastrand::f32() - 0.5, fastrand::f32() - 0.5)
                 .normalize_or_zero() * 6.0;
             brain.state = BrainState::Wander;
             brain.target_cell = None;
             brain.target_entity = None;
-            brain.desired_target = Some(map.clamp_target(pos.p + jitter));
+            route.desired_target = Some(map.clamp_target(pos.p + jitter));
             brain.replan_cd = 2.0 + fastrand::f32() * 2.0;
         }
     }
@@ -332,57 +324,21 @@ fn needs_tick_system(time: Res<Time>, mut q: Query<&mut Needs>) {
     }
 }
 
-// === Path === (unchanged)
-fn path_system(
-    mut q: Query<(&Position, &mut Path, &mut Brain)>,
-) {
-    for (pos, mut path, mut brain) in &mut q {
-        // read once into locals
-        let desired = brain.desired_target;
-
-        // keep your existing target sync logic
-        match (path.current_target, desired) {
-            (None, Some(goal)) => path.current_target = Some(goal),
-            (Some(cur), Some(goal)) if cur.distance_squared(pos.p) < 0.25 => {
-                path.current_target = Some(goal);
-            }
-            (Some(cur), Some(goal)) => {
-                if cur.distance_squared(goal) > 9.0 {
-                    path.current_target = Some(goal);
-                }
-            }
-            _ => {}
-        }
-
-        // arrival → start Eating (freeze movement)
-        if brain.state == BrainState::Forage {
-            if let Some(cell) = brain.target_cell {
-                let center = cell_center(cell);
-                if pos.p.distance_squared(center) < 0.05 {
-                    brain.state = BrainState::Eating;
-                    brain.desired_target = None;
-                    path.current_target = None; // freeze
-                }
-            }
-        }
-    }
-}
-
 // === Movement === (unchanged except borrow-safe accel)
 fn movement_system(
     time: Res<Time>,
     map: Res<super::world::TileMap>,
-    mut q: Query<(&mut Position, &mut Velocity, &Kinematics, &Path, &Brain)>,
+    mut q: Query<(&mut Position, &mut Velocity, &Kinematics, &Route, &Brain)>,
 ) {
     let dt = time.delta_secs();
     let eps = 1e-3;
     let min = Vec2::splat(eps);
     let max = map.world_max() - Vec2::splat(eps);
 
-    for (mut pos, mut vel, kin, path, brain) in &mut q {
+    for (mut pos, mut vel, kin, route, brain) in &mut q {
         let desired = if brain.state == BrainState::Eating {
             Vec2::ZERO
-        } else if let Some(goal) = path.current_target {
+        } else if let Some(goal) = route.current_target {
             let dir = (goal - pos.p).normalize_or_zero();
             let mult = map.speed_multiplier(pos.p);
             dir * (kin.base_speed * mult)
@@ -404,7 +360,7 @@ fn movement_system(
 
         pos.p = new_p;
 
-        if let Some(goal) = path.current_target {
+        if let Some(goal) = route.current_target {
             if pos.p.distance_squared(goal) < 0.01 {
                 pos.p = goal;
                 vel.v = Vec2::ZERO;
@@ -417,13 +373,25 @@ fn movement_system(
 fn eat_system(
     time: Res<Time>,
     mut map: ResMut<super::world::TileMap>,
-    mut q: Query<(&Species, &Position, &mut Needs, &mut Brain)>,
+    mut q: Query<(&Species, &Position, &mut Route, &mut Needs, &mut Brain)>,
 ) {
     let dt = time.delta_secs();
     const AVOID_SECONDS: f32 = 15.0;     // cooldown before reusing the same tile
     const EMPTY_EPS: f32    = 0.02;      // consider empty below this
 
-    for (sp, pos, mut needs, mut brain) in &mut q {
+    for (sp, pos, mut route, mut needs, mut brain) in &mut q {
+        // arrival → start Eating (freeze movement)
+        if brain.state == BrainState::Forage {
+            if let Some(cell) = brain.target_cell {
+                let center = cell_center(cell);
+                if pos.p.distance_squared(center) < 0.05 {
+                    brain.state = BrainState::Eating;
+                    route.desired_target = None;
+                    route.current_target = None; // freeze
+                }
+            }
+        }
+
         if brain.state != BrainState::Eating { continue; }
 
         // Must stand basically at the target food cell
@@ -436,7 +404,7 @@ fn eat_system(
         if pos.p.distance_squared(center) > 0.05 {
             // drifted away: return to forage toward that cell
             brain.state = BrainState::Forage;
-            brain.desired_target = Some(center);
+            route.desired_target = Some(center);
             continue;
         }
 
@@ -458,7 +426,7 @@ fn eat_system(
             brain.last_food_cell = Some(cell);
             brain.last_food_cooldown = AVOID_SECONDS;
             brain.state = BrainState::Forage;     // still hungry: find something else
-            brain.desired_target = None;
+            route.desired_target = None;
             continue;
         }
 
@@ -494,38 +462,38 @@ fn eat_system(
             brain.last_food_cooldown = AVOID_SECONDS;     // avoid for a bit
             brain.state = BrainState::Wander;             // go relax
             brain.target_cell = None;
-            brain.desired_target = None;                  // let decision pick a wander goal
+            route.desired_target = None;                  // let decision pick a wander goal
         }
     }
 }
 
 fn hunt_track_system(
     map: Res<super::world::TileMap>,
-    mut predators: Query<(&Position, &mut Brain), (With<Species>,)>,
+    mut predators: Query<(&Position, &mut Brain, &mut Route), (With<Species>,)>,
     prey_q: Query<(&Position, &Species), With<Species>>,
 ) {
-    for (ppos, mut brain) in &mut predators {
+    for (ppos, mut brain, mut route) in &mut predators {
         if brain.state != BrainState::Hunt { continue; }
         let Some(target) = brain.target_entity else { continue; };
 
         if let Ok((prey_pos, _prey_sp)) = prey_q.get(target) {
             // update pursuit target to the prey's current position
-            brain.desired_target = Some(map.clamp_target(prey_pos.p));
+            route.desired_target = Some(map.clamp_target(prey_pos.p));
         } else {
             // target despawned / lost: fall back to wander
             brain.state = BrainState::Wander;
             brain.target_entity = None;
-            brain.desired_target = Some(map.clamp_target(ppos.p));
+            route.desired_target = Some(map.clamp_target(ppos.p));
         }
     }
 }
 
 fn attack_system(
     mut commands: Commands,
-    mut predators: Query<(&Species, &Position, &mut Needs, &mut Brain)>,
+    mut predators: Query<(&Species, &Position, &mut Needs, &mut Brain, &mut Route)>,
     prey_q: Query<(Entity, &Species, &Position)>,
 ) {
-    for (_pred_sp, ppos, mut needs, mut brain) in &mut predators {
+    for (_pred_sp, ppos, mut needs, mut brain, mut route) in &mut predators {
         if brain.state != BrainState::Hunt { continue; }
         let Some(target) = brain.target_entity else { continue; };
 
@@ -542,18 +510,18 @@ fn attack_system(
                 brain.target_entity = None;
                 if needs.is_hungry() {
                     // keep hunting; decision_system will pick a new target
-                    brain.desired_target = None;
+                    route.desired_target = None;
                 } else {
                     // relax
                     brain.state = BrainState::Wander;
-                    brain.desired_target = None;
+                    route.desired_target = None;
                 }
             }
         } else {
             // lost target (already despawned)
             brain.state = BrainState::Wander;
             brain.target_entity = None;
-            brain.desired_target = None;
+            route.desired_target = None;
         }
     }
 }
@@ -561,7 +529,7 @@ fn attack_system(
 fn prey_flee_system(
     map: Res<super::world::TileMap>,
     predators: Query<(&Species, &Position), With<Species>>,
-    mut prey: Query<(&Species, &Position, &mut Brain), With<Species>>,
+    mut prey: Query<(&Species, &Position, &mut Brain, &mut Route), With<Species>>,
 ) {
     // collect predator positions
     let preds: Vec<Vec2> = predators
@@ -571,7 +539,7 @@ fn prey_flee_system(
 
     if preds.is_empty() { return; }
 
-    for (sp, pos, mut brain) in &mut prey {
+    for (sp, pos, mut brain, mut route) in &mut prey {
         if is_predator(*sp) { continue; } // predators don't flee in this simple pass
 
         // nearest predator
@@ -598,7 +566,7 @@ fn prey_flee_system(
 
             // dash away and clamp
             let flee_goal = map.clamp_target(pos.p + away * FLEE_STEP);
-            brain.desired_target = Some(flee_goal);
+            route.desired_target = Some(flee_goal);
             // small replan so they can keep running if still threatened
             brain.replan_cd = 0.3;
         }
