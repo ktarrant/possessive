@@ -26,6 +26,7 @@
 // src/main.rs (example wiring)
 use bevy::prelude::*;
 mod units;
+use units::base::*;
 use units::world::*;
 use units::creature::*;
 use units::simview::SimViewPlugin;

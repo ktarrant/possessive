@@ -3,3 +3,4 @@ pub mod creature;
 pub mod world;
 pub mod simview;
 pub mod route;
+pub mod forage;

@@ -1,9 +1,8 @@
 use bevy::prelude::*;
 use bevy::ui::{UiRect, PositionType, BackgroundColor, BorderColor};
 
-use super::base::{Position};
+use super::base::{Position, Species};
 use super::world::{TileMap, TileObject, Terrain, food_totals, TILE_SIZE};
-use super::creature::{Species};
 
 
 const VIS_TILE_PIXELS: f32 = 16.0;
@@ -126,7 +125,7 @@ fn spawn_map_sprites(mut commands: Commands, map: Res<TileMap>) {
 // --- animals ---
 fn attach_animal_sprites(
     mut commands: Commands,
-    q: Query<(Entity, &super::creature::Species), Added<super::creature::Species>>
+    q: Query<(Entity, &Species), Added<Species>>
 ) {
     for (e, sp) in &q {
         commands.entity(e).insert((
