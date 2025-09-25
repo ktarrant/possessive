@@ -41,7 +41,6 @@ pub fn forage_system(
             }
 
             if let Some((e, target_pos, _d2, _prey_sp)) = best {
-                brain.state = BrainState::Hunt;
                 brain.target_entity = Some(e);
                 brain.target_cell = None;
                 brain.replan_cd = 0.15; // track frequently
@@ -53,7 +52,6 @@ pub fn forage_system(
             if brain.replan_cd <= 0.0 || brain.desired_target.is_none() {
                 let jitter = Vec2::new(fastrand::f32() - 0.5, fastrand::f32() - 0.5)
                     .normalize_or_zero() * 5.0;
-                brain.state = BrainState::Hunt; // "searching"
                 brain.replan_cd = 0.6;
                 brain.desired_target = Some(map.clamp_target(pos.p + jitter));
             }

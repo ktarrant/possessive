@@ -16,7 +16,7 @@ pub struct Velocity { pub v: Vec2 }
 pub struct Kinematics { pub base_speed: f32 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum BrainState { Wander, Forage, Eating, Hunt, Flee }
+pub enum BrainState { Wander, Forage, Eating, Flee }
 
 #[derive(Component, Debug)]
 pub struct Brain {

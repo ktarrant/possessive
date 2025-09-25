@@ -68,8 +68,8 @@ fn species_color(sp: Species) -> Color {
         Species::Squirrel => Color::srgb(0.72, 0.40, 0.10), // brown-ish
         Species::Deer     => Color::srgb(0.60, 0.45, 0.30),
         Species::Bird     => Color::srgb(0.15, 0.55, 0.95),
-        Species::Fox      => Color::srgb(0.95, 0.40, 0.10),
-        Species::Bear     => Color::srgb(0.25, 0.25, 0.30),
+        Species::Fox      => Color::srgba_u8(255,   0, 200, 255), // magenta
+        Species::Bear     => Color::srgba_u8(255,   0,   0, 255), // red
     }
 }
 

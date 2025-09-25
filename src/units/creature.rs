@@ -24,14 +24,6 @@ impl Needs {
     pub fn is_hungry(&self) -> bool { self.satiation < self.hungry_threshold }
 }
 
-// species diet flags (for now only plants; predators still wander)
-// fn wants_nuts(sp: Species) -> bool {
-//     matches!(sp, Species::Squirrel | Species::Bird)
-// }
-// fn wants_berries(sp: Species) -> bool {
-//     matches!(sp, Species::Squirrel | Species::Bird | Species::Deer)
-// }
-
 // species presets
 fn default_needs(sp: Species) -> Needs {
     match sp {
@@ -82,7 +74,6 @@ impl Plugin for WildlifeSimPlugin {
             .add_systems(Update, prey_flee_system.before(SimSet::Decision))
             .add_systems(Update, decision_system.in_set(SimSet::Decision))
             .add_systems(Update, forage_system.in_set(SimSet::Decision))
-            .add_systems(Update, hunt_track_system.in_set(SimSet::Decision))
 
             // PATH & MOVEMENT as you already have
             .add_systems(Update, route_system.in_set(SimSet::Route))
@@ -108,9 +99,7 @@ fn decision_system(
         if brain.replan_cd > 0.0 { continue; }
 
         // Eating freezes decisions; let eat_system decide exit
-        if brain.state == BrainState::Eating { continue; }
-
-        else if brain.state == BrainState::Wander {
+        if brain.state == BrainState::Wander {
             if needs.is_hungry() {
                 brain.replan_cd = 0.75;
                 brain.state = BrainState::Forage;
@@ -119,9 +108,6 @@ fn decision_system(
                 if brain.replan_cd > 0.0 && brain.desired_target.is_some() { continue; }
                 let jitter = Vec2::new(fastrand::f32() - 0.5, fastrand::f32() - 0.5)
                     .normalize_or_zero() * 6.0;
-                brain.state = BrainState::Wander;
-                brain.target_cell = None;
-                brain.target_entity = None;
                 brain.desired_target = Some(map.clamp_target(pos.p + jitter));
                 brain.replan_cd = 2.0 + fastrand::f32() * 2.0;
             }
@@ -290,34 +276,13 @@ fn eat_system(
     }
 }
 
-fn hunt_track_system(
-    map: Res<super::world::TileMap>,
-    mut predators: Query<(&Position, &mut Brain), (With<Species>,)>,
-    prey_q: Query<(&Position, &Species), With<Species>>,
-) {
-    for (ppos, mut brain) in &mut predators {
-        if brain.state != BrainState::Hunt { continue; }
-        let Some(target) = brain.target_entity else { continue; };
-
-        if let Ok((prey_pos, _prey_sp)) = prey_q.get(target) {
-            // update pursuit target to the prey's current position
-            brain.desired_target = Some(map.clamp_target(prey_pos.p));
-        } else {
-            // target despawned / lost: fall back to wander
-            brain.state = BrainState::Wander;
-            brain.target_entity = None;
-            brain.desired_target = Some(map.clamp_target(ppos.p));
-        }
-    }
-}
-
 fn attack_system(
     mut commands: Commands,
     mut predators: Query<(&Species, &Position, &mut Needs, &mut Brain)>,
     prey_q: Query<(Entity, &Species, &Position)>,
 ) {
     for (_pred_sp, ppos, mut needs, mut brain) in &mut predators {
-        if brain.state != BrainState::Hunt { continue; }
+        if brain.state != BrainState::Forage { continue; }
         let Some(target) = brain.target_entity else { continue; };
 
         if let Ok((prey_e, prey_sp, prey_pos)) = prey_q.get(target) {
