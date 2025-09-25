@@ -25,40 +25,33 @@
 
 // src/main.rs (example wiring)
 use bevy::prelude::*;
-mod units { pub mod world; pub mod creature; }
+mod units { pub mod world; pub mod creature; pub mod simview; }
 use units::world::*;
 use units::creature::*;
+use units::simview::SimViewPlugin;
 
 fn main() {
     App::new()
-        .add_plugins(MinimalPlugins) // swap to DefaultPlugins in your game
-        .insert_resource(make_demo_map())
-        .add_plugins(WildlifeSimPlugin)
-        .add_systems(Startup, spawn_demo)
+        .add_plugins(DefaultPlugins)
+        .insert_resource(make_demo_map(64, 64))
+        .add_plugins(WildlifeSimPlugin) // decision → path → movement
+        .add_plugins(SimViewPlugin)     // draw map + metrics UI
+        .add_systems(Startup, spawn_demo_creatures)
+        .add_systems(Update, plants_regrow_system) // keeps berries/nuts rising
         .run();
 }
 
-fn make_demo_map() -> TileMap {
-    // 64x64 map with a watery stripe
-    let mut map = TileMap::new(64, 64, Tile { terrain: Terrain::Grassland, object: None });
-    for y in 0..map.height {
-        for x in 0..map.width {
-            let idx = (y * map.width + x) as usize;
-            let terrain = if x % 13 == 0 { Terrain::Water }
-            else if y % 17 == 0 { Terrain::Mountain }
-            else if (x + y) % 7 == 0 { Terrain::Forest }
-            else { Terrain::Grassland };
-            map.tiles[idx].terrain = terrain;
-        }
+fn spawn_demo_creatures(mut commands: Commands) {
+    // sprinkle a few of each
+    let spawns = [
+        (Species::Squirrel, Vec2::new(10.0, 10.0), 2.2),
+        (Species::Squirrel, Vec2::new(14.0, 16.0), 2.2),
+        (Species::Deer,     Vec2::new(20.0, 12.0), 2.0),
+        (Species::Bird,     Vec2::new(12.0, 22.0), 2.6),
+        (Species::Fox,      Vec2::new(30.0, 18.0), 2.4),
+        (Species::Bear,     Vec2::new(40.0, 40.0), 1.8),
+    ];
+    for (sp, p, speed) in spawns {
+        commands.spawn(CreatureBundle::new(sp, p, speed));
     }
-    map
-}
-
-fn spawn_demo(mut commands: Commands) {
-    // Drop in a few creatures
-    commands.spawn(CreatureBundle::new(Species::Squirrel, Vec2::new(10.0, 10.0), 2.2));
-    commands.spawn(CreatureBundle::new(Species::Deer,     Vec2::new(20.0, 12.0), 2.0));
-    commands.spawn(CreatureBundle::new(Species::Bird,     Vec2::new(12.0, 22.0), 2.6));
-    commands.spawn(CreatureBundle::new(Species::Fox,      Vec2::new(30.0, 18.0), 2.4));
-    commands.spawn(CreatureBundle::new(Species::Bear,     Vec2::new(40.0, 40.0), 1.8));
 }
