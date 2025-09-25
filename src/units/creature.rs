@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use std::collections::HashSet;
 use super::base::{Position, Velocity, Kinematics, Species, BrainState, Brain};
 use super::world::{TILE_SIZE};
 use super::route::{Route, route_system};
@@ -10,6 +11,11 @@ pub const ATTACK_RANGE: f32         = 0.35 * TILE_SIZE;
 
 pub const FLEE_SENSE_RANGE: f32 = 6.0;              // tiles
 pub const FLEE_STEP: f32        = 6.0;              // tiles to dash when spooked
+
+// Reproduction
+pub const MATE_RANGE_TILES: f32 = 0.75;  // how close they must be (in tiles)
+pub const REPRO_COOLDOWN: f32   = 30.0;  // seconds before parents can mate again
+pub const OFFSPRING_JITTER: f32 = 0.15;  // in tiles, to avoid perfect overlap
 
 // NEW: basic needs/satiation
 #[derive(Component, Debug)]
@@ -36,6 +42,17 @@ fn default_needs(sp: Species) -> Needs {
     }
 }
 
+#[derive(Component, Debug)]
+pub struct Repro {
+    pub timer: f32,     // seconds remaining on cooldown (<= 0.0 means ready)
+}
+impl Default for Repro {
+    fn default() -> Self { Self { timer: 0.0 } }
+}
+impl Repro {
+    #[inline] pub fn ready(&self) -> bool { self.timer <= 0.0 }
+}
+
 #[derive(Bundle, Debug)]
 pub struct CreatureBundle {
     pub species: Species,
@@ -45,6 +62,7 @@ pub struct CreatureBundle {
     pub needs: Needs,
     pub brain: Brain,
     pub route: Route,
+    pub repro: Repro,
 }
 
 impl CreatureBundle {
@@ -57,6 +75,7 @@ impl CreatureBundle {
             needs: default_needs(species), // NEW
             brain: Brain::default(),
             route: Route::default(),
+            repro: Repro::default(),
         }
     }
 }
@@ -70,6 +89,7 @@ impl Plugin for WildlifeSimPlugin {
     fn build(&self, app: &mut App) {
         app.configure_sets(Update, (SimSet::Decision, SimSet::Route, SimSet::Movement).chain())
             .add_systems(Update, needs_tick_system.before(SimSet::Decision))
+            .add_systems(Update, repro_cooldown_system.before(SimSet::Decision))
 
             // DECISION set: prey flee first, then main decision, then hunt tracking
             .add_systems(Update, prey_flee_system.before(SimSet::Decision))
@@ -81,6 +101,7 @@ impl Plugin for WildlifeSimPlugin {
             .add_systems(Update, movement_system.in_set(SimSet::Movement))
 
             // Resolve attacks after movement (positions are up-to-date)
+            .add_systems(Update, mating_system.after(SimSet::Movement)) 
             .add_systems(Update, eat_system.after(SimSet::Movement))
             .add_systems(Update, attack_system.after(SimSet::Movement));
     }
@@ -232,6 +253,7 @@ fn eat_system(
     }
 }
 
+// === Attack and Flee ===
 fn attack_system(
     mut commands: Commands,
     mut predators: Query<(&Species, &Position, &mut Needs, &mut Brain)>,
@@ -313,6 +335,106 @@ fn prey_flee_system(
             brain.desired_target = Some(flee_goal);
             // small replan so they can keep running if still threatened
             brain.replan_cd = 0.3;
+        }
+    }
+}
+
+// === Reproduction ===
+fn repro_cooldown_system(time: Res<Time>, mut q: Query<&mut Repro>) {
+    let dt = time.delta_secs();
+    for mut r in &mut q {
+        if r.timer > 0.0 {
+            r.timer -= dt;
+            if r.timer < 0.0 { r.timer = 0.0; }
+        }
+    }
+}
+
+fn mating_system(
+    mut commands: Commands,
+    map: Res<super::world::TileMap>,
+
+    // Use ParamSet to separate read phase and write phase
+    mut ps: ParamSet<(
+        // p0: read-only scan of candidates
+        Query<(Entity, &Species, &Position, &Kinematics, &Needs, &Brain, &Repro)>,
+        // p1: mutate chosen parents together
+        Query<(&mut Needs, &mut Brain, &mut Repro)>,
+    )>,
+) {
+    let mate_r2 = (MATE_RANGE_TILES * TILE_SIZE).powi(2);
+    let jitter_r = OFFSPRING_JITTER * TILE_SIZE;
+
+    // -------- Phase A: collect eligible candidates (immutable borrow) --------
+    let mut cand: Vec<(Entity, Species, Vec2, f32)> = Vec::new(); // (e, sp, pos, base_speed)
+    {
+        let q_scan = ps.p0();
+        for (e, sp, pos, kin, needs, brain, repro) in q_scan.iter() {
+            if brain.state != BrainState::Wander { continue; }
+            if needs.is_hungry() { continue; }
+            if repro.timer > 0.0 { continue; } // not ready
+            cand.push((e, *sp, pos.p, kin.base_speed));
+        }
+    } // <-- p0 borrow ends here
+
+    // -------- Phase B: greedy pair & spawn, mutating via p1 --------
+    let mut used: HashSet<Entity> = HashSet::new();
+    let mut q_parents = ps.p1();
+
+    for i in 0..cand.len() {
+        let (e1, sp1, p1, s1) = cand[i];
+        if used.contains(&e1) { continue; }
+
+        // find nearest same-species partner j>i
+        let mut best_j: Option<usize> = None;
+        let mut best_d2 = f32::MAX;
+
+        for j in (i + 1)..cand.len() {
+            let (e2, sp2, p2, _s2) = cand[j];
+            if used.contains(&e2) { continue; }
+            if sp1 != sp2 { continue; }
+
+            let d2 = p1.distance_squared(p2);
+            if d2 <= mate_r2 && d2 < best_d2 {
+                best_d2 = d2;
+                best_j = Some(j);
+            }
+        }
+
+        let Some(j) = best_j else { continue; };
+        let (e2, _sp2, p2, s2) = cand[j];
+
+        let mid = (p1 + p2) * 0.5
+            + Vec2::new(fastrand::f32() - 0.5, fastrand::f32() - 0.5)
+                .normalize_or_zero() * jitter_r;
+        let child_pos = map.clamp_target(mid);
+        let child_speed = (s1 + s2) * 0.5;
+
+        // Mutate both parents together safely
+        if let Ok([ (mut n1, mut b1, mut r1), (mut n2, mut b2, mut r2) ]) =
+            q_parents.get_many_mut([e1, e2])
+        {
+            // Parents: hungry + back to Wander
+            n1.satiation = 0.0; n2.satiation = 0.0;
+
+            b1.state = BrainState::Wander;
+            b1.desired_target = None;
+            b1.target_cell = None;
+            b1.target_entity = None;
+
+            b2.state = BrainState::Wander;
+            b2.desired_target = None;
+            b2.target_cell = None;
+            b2.target_entity = None;
+
+            r1.timer = REPRO_COOLDOWN;
+            r2.timer = REPRO_COOLDOWN;
+
+            // Spawn offspring
+            commands.spawn(CreatureBundle::new(sp1, child_pos, child_speed));
+
+            used.insert(e1);
+            used.insert(e2);
         }
     }
 }
