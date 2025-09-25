@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use std::collections::HashSet;
+use std::collections::HashMap;
 use super::base::{Position, Velocity, Kinematics, Species, BrainState, Brain};
 use super::world::{TILE_SIZE};
 use super::route::{Route, route_system};
@@ -354,87 +354,107 @@ fn mating_system(
     mut commands: Commands,
     map: Res<super::world::TileMap>,
 
-    // Use ParamSet to separate read phase and write phase
+    // ParamSet avoids B0001 by separating read & write phases
     mut ps: ParamSet<(
-        // p0: read-only scan of candidates
+        // p0: read-only scan to collect candidates
         Query<(Entity, &Species, &Position, &Kinematics, &Needs, &Brain, &Repro)>,
-        // p1: mutate chosen parents together
+        // p1: write parents when we commit a pair
         Query<(&mut Needs, &mut Brain, &mut Repro)>,
     )>,
 ) {
     let mate_r2 = (MATE_RANGE_TILES * TILE_SIZE).powi(2);
     let jitter_r = OFFSPRING_JITTER * TILE_SIZE;
 
-    // -------- Phase A: collect eligible candidates (immutable borrow) --------
-    let mut cand: Vec<(Entity, Species, Vec2, f32)> = Vec::new(); // (e, sp, pos, base_speed)
+    // -------- Phase A: collect eligible candidates & build bins --------
+    // We store candidates in a Vec so bins keep small indices, not Entities.
+    #[derive(Clone, Copy)]
+    struct Cand { e: Entity, sp: Species, pos: Vec2, speed: f32, cell: IVec2 }
+
+    let mut cands: Vec<Cand> = Vec::new();
     {
-        let q_scan = ps.p0();
-        for (e, sp, pos, kin, needs, brain, repro) in q_scan.iter() {
+        let q = ps.p0();
+        for (e, sp, pos, kin, needs, brain, repro) in q.iter() {
             if brain.state != BrainState::Wander { continue; }
             if needs.is_hungry() { continue; }
-            if repro.timer > 0.0 { continue; } // not ready
-            cand.push((e, *sp, pos.p, kin.base_speed));
+            if !repro.ready() { continue; }
+            let cell = map.cell_at_world(pos.p);
+            cands.push(Cand { e, sp: *sp, pos: pos.p, speed: kin.base_speed, cell });
         }
-    } // <-- p0 borrow ends here
+    }
+    if cands.len() < 2 { return; }
 
-    // -------- Phase B: greedy pair & spawn, mutating via p1 --------
-    let mut used: HashSet<Entity> = HashSet::new();
+    // Bin by cell; key as (i32,i32) to avoid Hash on IVec2
+    let mut bins: HashMap<(i32,i32), Vec<usize>> = HashMap::with_capacity(cands.len());
+    for (i, c) in cands.iter().enumerate() {
+        bins.entry((c.cell.x, c.cell.y)).or_default().push(i);
+    }
+
+    // -------- Phase B: greedy pairing from bins; mutate via p1 --------
+    let mut used = vec![false; cands.len()];
     let mut q_parents = ps.p1();
 
-    for i in 0..cand.len() {
-        let (e1, sp1, p1, s1) = cand[i];
-        if used.contains(&e1) { continue; }
+    // Neighbor offsets (own cell + 8 neighbors)
+    const OFFS: [(i32,i32); 9] = [
+        (-1,-1), (0,-1), (1,-1),
+        (-1, 0), (0, 0), (1, 0),
+        (-1, 1), (0, 1), (1, 1),
+    ];
 
-        // find nearest same-species partner j>i
-        let mut best_j: Option<usize> = None;
+    for i in 0..cands.len() {
+        if used[i] { continue; }
+        let a = cands[i];
+
+        // search nearest compatible partner in neighbor bins
+        let mut best: Option<usize> = None;
         let mut best_d2 = f32::MAX;
 
-        for j in (i + 1)..cand.len() {
-            let (e2, sp2, p2, _s2) = cand[j];
-            if used.contains(&e2) { continue; }
-            if sp1 != sp2 { continue; }
-
-            let d2 = p1.distance_squared(p2);
-            if d2 <= mate_r2 && d2 < best_d2 {
-                best_d2 = d2;
-                best_j = Some(j);
+        for (dx, dy) in OFFS {
+            let key = (a.cell.x + dx, a.cell.y + dy);
+            if let Some(list) = bins.get(&key) {
+                for &j in list {
+                    if j == i || used[j] { continue; }
+                    let b = cands[j];
+                    if b.sp != a.sp { continue; }
+                    let d2 = a.pos.distance_squared(b.pos);
+                    if d2 <= mate_r2 && d2 < best_d2 {
+                        best_d2 = d2;
+                        best = Some(j);
+                    }
+                }
             }
         }
 
-        let Some(j) = best_j else { continue; };
-        let (e2, _sp2, p2, s2) = cand[j];
+        let Some(j) = best else { continue; };
+        let b = cands[j];
 
-        let mid = (p1 + p2) * 0.5
+        // Offspring placement & speed
+        let mid = (a.pos + b.pos) * 0.5
             + Vec2::new(fastrand::f32() - 0.5, fastrand::f32() - 0.5)
                 .normalize_or_zero() * jitter_r;
         let child_pos = map.clamp_target(mid);
-        let child_speed = (s1 + s2) * 0.5;
+        let child_speed = (a.speed + b.speed) * 0.5;
 
-        // Mutate both parents together safely
-        if let Ok([ (mut n1, mut b1, mut r1), (mut n2, mut b2, mut r2) ]) =
-            q_parents.get_many_mut([e1, e2])
+        // Mutate parents together (no aliasing)
+        if let Ok([ (mut n1, mut br1, mut r1), (mut n2, mut br2, mut r2) ]) =
+            q_parents.get_many_mut([a.e, b.e])
         {
-            // Parents: hungry + back to Wander
+            // Parents become hungry and chill
             n1.satiation = 0.0; n2.satiation = 0.0;
 
-            b1.state = BrainState::Wander;
-            b1.desired_target = None;
-            b1.target_cell = None;
-            b1.target_entity = None;
+            br1.state = BrainState::Wander;
+            br1.desired_target = None; br1.target_cell = None; br1.target_entity = None;
 
-            b2.state = BrainState::Wander;
-            b2.desired_target = None;
-            b2.target_cell = None;
-            b2.target_entity = None;
+            br2.state = BrainState::Wander;
+            br2.desired_target = None; br2.target_cell = None; br2.target_entity = None;
 
             r1.timer = REPRO_COOLDOWN;
             r2.timer = REPRO_COOLDOWN;
 
-            // Spawn offspring
-            commands.spawn(CreatureBundle::new(sp1, child_pos, child_speed));
+            // Spawn offspring (same species)
+            commands.spawn(CreatureBundle::new(a.sp, child_pos, child_speed));
 
-            used.insert(e1);
-            used.insert(e2);
+            used[i] = true;
+            used[j] = true;
         }
     }
 }
