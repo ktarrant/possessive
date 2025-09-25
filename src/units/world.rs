@@ -68,18 +68,18 @@ impl TileMap {
     }
     
     /// World-space bounds (origin at 0,0)
-    pub fn world_min(&self) -> Vec2 { Vec2::ZERO }
+    // pub fn world_min(&self) -> Vec2 { Vec2::ZERO }
     pub fn world_max(&self) -> Vec2 {
         Vec2::new(self.width as f32 * TILE_SIZE, self.height as f32 * TILE_SIZE)
     }
 
     /// Clamp any world pos just inside the edges (epsilon avoids flicker at -0/width)
-    pub fn clamp_world(&self, p: Vec2) -> Vec2 {
-        let eps = 1e-3;
-        let min = self.world_min() + Vec2::splat(eps);
-        let max = self.world_max() - Vec2::splat(eps);
-        p.clamp(min, max)
-    }
+    // pub fn clamp_world(&self, p: Vec2) -> Vec2 {
+    //     let eps = 1e-3;
+    //     let min = self.world_min() + Vec2::splat(eps);
+    //     let max = self.world_max() - Vec2::splat(eps);
+    //     p.clamp(min, max)
+    // }
 
     /// Clamp targets toward tile centers so goals never land outside
     pub fn clamp_target(&self, p: Vec2) -> Vec2 {

@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use super::world::{TileMap, TILE_SIZE};
+use super::world::{TILE_SIZE};
 
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
 
@@ -26,12 +26,12 @@ impl Needs {
 }
 
 // species diet flags (for now only plants; predators still wander)
-fn wants_nuts(sp: Species) -> bool {
-    matches!(sp, Species::Squirrel | Species::Bird)
-}
-fn wants_berries(sp: Species) -> bool {
-    matches!(sp, Species::Squirrel | Species::Bird | Species::Deer)
-}
+// fn wants_nuts(sp: Species) -> bool {
+//     matches!(sp, Species::Squirrel | Species::Bird)
+// }
+// fn wants_berries(sp: Species) -> bool {
+//     matches!(sp, Species::Squirrel | Species::Bird | Species::Deer)
+// }
 
 // species presets
 fn default_needs(sp: Species) -> Needs {
@@ -123,7 +123,6 @@ fn decision_system(
 ) {
     let dt = time.delta_secs();
     const HYSTERESIS_RATIO: f32 = 0.45;     // ~45% regrown before we consider the same tile again
-    const AVOID_SECONDS: f32    = 15.0;     // or after 15s cooldown
 
     for (sp, needs, pos, mut brain) in &mut q {
         // cooldown tick
