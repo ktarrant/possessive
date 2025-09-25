@@ -94,7 +94,6 @@ impl Plugin for WildlifeSimPlugin {
 }
 
 // === Decision: forage if hungry; otherwise wander ===
-
 fn decision_system(
     time: Res<Time>,
     map: Res<TileMap>,
@@ -106,21 +105,21 @@ fn decision_system(
         if brain.replan_cd > 0.0 && brain.desired_target.is_some() { continue; }
 
         if needs.is_hungry() {
-            // find nearest viable food tile; fallback to short wander if none
             if let Some(cell) = nearest_food_cell(&map, *sp, pos.p) {
-                brain.desired_target = Some(cell_center(cell));
-                brain.replan_cd = 1.0; // quick replan cadence while hungry
+                brain.desired_target = Some(map.clamp_target(cell_center(cell))); // <- clamp
+                brain.replan_cd = 1.0;
                 continue;
             }
         }
 
-        // Wander target (small jitter around current pos)
+        // Wander, but keep the goal inside the map
         let jitter = Vec2::new(fastrand::f32() - 0.5, fastrand::f32() - 0.5)
             .normalize_or_zero() * 6.0;
-        brain.desired_target = Some(pos.p + jitter);
+        brain.desired_target = Some(map.clamp_target(pos.p + jitter)); // <- clamp
         brain.replan_cd = 2.0 + fastrand::f32() * 2.0;
     }
 }
+
 
 // find the nearest tile that provides something this species eats and has stock
 fn nearest_food_cell(map: &TileMap, sp: Species, from: Vec2) -> Option<IVec2> {
@@ -183,6 +182,12 @@ fn movement_system(
     mut q: Query<(&mut Position, &mut Velocity, &Kinematics, &Path)>,
 ) {
     let dt = time.delta_secs();
+
+    // Precompute interior bounds for quick axis checks
+    let eps = 1e-3;
+    let min = Vec2::splat(eps);
+    let max = map.world_max() - Vec2::splat(eps);
+
     for (mut pos, mut vel, kin, path) in &mut q {
         let desired = if let Some(goal) = path.current_target {
             let dir = (goal - pos.p).normalize_or_zero();
@@ -193,7 +198,17 @@ fn movement_system(
         let accel = 10.0;
         let cur_v = vel.v;
         vel.v = cur_v + (desired - cur_v) * (accel * dt);
-        pos.p += vel.v * dt;
+
+        let old = pos.p;
+        let mut new_p = old + vel.v * dt;
+
+        // Clamp & zero only the axis that hit the wall
+        if new_p.x < min.x { new_p.x = min.x; vel.v.x = 0.0; }
+        if new_p.x > max.x { new_p.x = max.x; vel.v.x = 0.0; }
+        if new_p.y < min.y { new_p.y = min.y; vel.v.y = 0.0; }
+        if new_p.y > max.y { new_p.y = max.y; vel.v.y = 0.0; }
+
+        pos.p = new_p;
 
         if let Some(goal) = path.current_target {
             if pos.p.distance_squared(goal) < 0.01 {
