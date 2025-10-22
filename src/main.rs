@@ -37,7 +37,7 @@ fn main() {
         None,         // blend: use template (or defaults)
         None,         // fractal: use template (or defaults)
         TERRAIN_SEED, // terrain_seed
-        None, // PNG dir or None
+        Some(terrain_out), // PNG dir or None
     );
     
     // Build the TileMap and apply objects

@@ -1,5 +1,5 @@
 (
-  size: (512, 512),
+  size: (256, 256),
   player_spawns: ( center_radius: 180, elevation: 8.0, base_radius: 15 ),
   terrain: (
     default: ( grassland: 0.2, forest: 0.75, water: 0.05, mountain: 0.00 ),
